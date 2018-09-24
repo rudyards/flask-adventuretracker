@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Delete RPG
+{% endblock %}
+
+{% block main %}
+    <p>Are you sure you want to remove {{playerName}} from {{RPGName}}?</p>
+    <form action="/dropPlayer" method="post">
+        <div class="form-group"> <input class="form-control" name="rpgID" value="{{rpgID}}" type="hidden"/>
+            <input class="form-control" name="playerID" value="{{playerID}}" type="hidden"/></div>
+        <button class="btn btn-primary" type="submit">Yes, Drop This Player</button>
+    </form>
+    <a class="btn btn-primary btn-lg active" role="button" href="/rpg?rpgID={{rpgID}}">No, Take Me Back</a></button>
+{% endblock %}

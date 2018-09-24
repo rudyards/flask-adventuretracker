@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Settings
+{% endblock %}
+
+{% block main %}
+    <form action="/settings" method="post">
+        <div class="form-group">
+            Username: {{ username }}
+            <input autocomplete="off" autofocus class="form-control" name="username" placeholder="New Username" type="text"/><br>
+            Timezone: UTC {{ timezone }} (Include a '-' if offset is negative)
+            <input autocomplete="off" autofocus class="form-control" name="timezone" placeholder="New timezone" type="text"/><br>
+            (Los Angeles: UTC -7; New York: UTC -4; London: UTC +1; Hong Kong: UTC +8)<br>
+
+        </div>
+        <button class="btn btn-primary" type="submit">Save Changes</button>
+    </form>
+{% endblock %}

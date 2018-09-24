@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Edit {{rpgname}}
+{% endblock %}
+
+{% block main %}
+    <form action="/rpgedit" method="post">
+        <p>Game Name</p>
+        <div class="form-group">
+            <input autocomplete="off" autofocus class="form-control" name="gameName" value="{{rpgname}}" type="text"/>
+        </div>
+        <p>Game Description</p>
+        <div class="form-group">
+            <input autocomplete="off" autofocus class="form-control" name="gameDescription" value="{{rpgDescription}}" type="text"/></p>
+        </div>
+
+        <p>Run by {{gmName}}</p>
+
+        <table align="center">
+        {% for player in playerlist %}
+            <!-- This should not be name, it should be ID, and the conditional should be around the row, not just the data -->
+            <tr><td>{% if gmName != player.get("username") %}{{player.get("username")}} {% endif %}</td></tr>
+        {% endfor %}
+        </table>
+
+        <input type="hidden" name="rpgID" value="{{rpgID}}"/>
+        <button class="btn btn-primary" type="submit">Save Changes</button>
+        <a class="btn btn-primary " role="button" href="/deleterpg?rpgID={{rpgID}}">Delete RPG</a>
+        </form>
+{% endblock %}

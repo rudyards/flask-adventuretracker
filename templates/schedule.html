@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Schedule Game For {{GameName}}
+{% endblock %}
+
+{% block main %}
+<form action="/schedule" method="post">
+    Date (Format: MM/DD/YYYY)
+        <input type="text" value="{{dateAttempt}}" name="date"><br>
+    Time (Format: HH:MM, military time)
+        <input type="text" value="{{timeAttempt}}" name="time"><br>
+    Location (Must not be blank)
+        <input type="text" value="{{locationAttempt}}" name="location"><br><br><br><br>
+    {% if playerTimes != [] %}
+        {% for player in playerTimes %}
+        <tr><td>{{player}}</tr></td><br>
+        {% endfor %}<br>
+    {% endif %}
+
+
+    <button class="btn btn-primary" type="submit" name="action" value="Check">Check Timezones</button>
+    <button class="btn btn-primary" type="submit" name="action" value="Submit">Submit</button>
+
+    <input type="hidden" name="gameID" value="{{gameID}}"/>
+    <input type="hidden" name="timezone" value="{{timezone}}"/>
+    </form>
+{% endblock %}

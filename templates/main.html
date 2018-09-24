@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Homepage
+{% endblock %}
+
+{% block main %}
+    {% if gamesGMing != [] %}
+        The RPGs you are currently GMing:<br>
+        <table>
+        {% for game in gamesGMing %}
+            <tr>
+                <td><b><a href="/rpg?rpgID={{game.get("id")}}"><u>{{game.get("Name")}}</u></a></b></td>
+                <td>:{{game.get("Description")}}</td>
+                </tr>
+        {% endfor %}
+        </table>
+        <br>
+        <br>
+    {% endif %}
+
+    {% if gamesPlayingList != [] %}
+        The RPGs you are currently playing in:<br>
+        <table>
+        {% for game in gamesPlayingList %}
+            <tr>
+                <td><b><a href="/rpg?rpgID={{game.get("id")}}"><u>{{game.get("Name")}}</u></a></b>:</td>
+                <td>{{game.get("Description")}}</td>
+                </tr>
+        {% endfor %}
+        </table>
+
+    {% endif %}
+
+    {% if gamesPlayingList == [] and gamesGMing == [] %}
+        You aren't currently playing or running any RPGs. Maybe you should join or create one!
+    {% endif %}
+{% endblock %}

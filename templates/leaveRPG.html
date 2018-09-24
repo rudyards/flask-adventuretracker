@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Delete RPG
+{% endblock %}
+
+{% block main %}
+    <p>Are you sure you want to leave {{RPGName}}?</p>
+    <form action="/leaveRPG" method="post">
+        <div class="form-group"> <input autocomplete="off" autofocus class="form-control" name="rpgID" value="{{rpgID}}" type="hidden" readonly/></div>
+        <button class="btn btn-primary" type="submit">Yes, Leave This RPG</button>
+    </form>
+    <a class="btn btn-primary btn-lg active" role="button" href="/rpg?rpgID={{rpgID}}">No, Take Me Back</a></button>
+{% endblock %}

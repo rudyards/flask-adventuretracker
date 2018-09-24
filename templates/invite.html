@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Join RPG
+{% endblock %}
+
+{% block main %}
+    <p>Are you sure you want to join {{RPGName}}?</p>
+    <p>Description: {{Description}}</p>
+    <form action="/invite" method="post">
+    <button class="btn btn-primary" type="submit">Yes</button> <a class="btn btn-primary"  href="/">No</a></button>
+    <input type="hidden" name="gameHash" value="{{gameHash}}" /></div>
+    </form>
+
+{% endblock %}

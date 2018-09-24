@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    {{rpgname}}
+{% endblock %}
+
+{% block main %}
+        <p>This is the page for {{rpgname}}.</p>
+
+        <p>{{rpgDescription}}</p>
+
+        <p>Next Meeting: {{nextMeeting}} {{timezone}}</p>
+
+        <table>
+        <tr><td>Run by {{gmName}}</td></tr>
+        <tr><td>Players:</td><td>
+            {% if isGM == True %}  (Invite Link: <a href="/invite?code={{inviteHash}}">/invite?code={{inviteHash}}</a>) {% endif %}</td></tr>
+        {% for player in playerlist %}
+            <tr><td>{% if gmName != player.get("username") %}{{player.get("username")}}{% endif %}</td><td>{% if isGM == True and gmName != player.get("username") %}<a href="/dropPlayer?rpgID={{rpgID}}&playerID={{player.get('id')}}">Drop Player</a>{% endif %}</td></tr>
+        {% endfor %}
+        </table>
+        <br>
+        <br>
+        <br>
+        <br>
+        <br>
+        Scheduled Games:
+        <table align=center>
+            {% for meeting in meetingsList %}
+            <tr><td>{{meeting}}</td></tr>
+            {% endfor %}
+        </table>
+        <br><br><br>
+        {% if isGM == True %}
+            <a class="btn btn-primary" role="button" href="/rpgedit?rpgID={{rpgID}}">Make Edits</a>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            {% endif %}
+        {% if isGM == True %}
+            <a class="btn btn-primary" role="button" href="/schedule?rpgID={{rpgID}}">Schedule Next Game</a>
+            {% endif %}
+        {% if isPlayer == True %}
+            <a class="btn btn-primary" role="button" href="/leaveRPG?rpgID={{rpgID}}">Leave This Game</a>
+            {% endif %}
+
+{% endblock %}
