@@ -1,1 +1,1 @@
-web: gunicorn flask-adventuretracker:Application.py
+web: gunicorn app:adventuretracker
