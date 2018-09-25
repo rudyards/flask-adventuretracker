@@ -11,7 +11,7 @@ from werkzeug.exceptions    import default_exceptions
 from werkzeug.security      import check_password_hash, generate_password_hash
 
 
-from helpers import falseHash, dehash
+from helper import falseHash, dehash
 
 
 app = Flask(__name__)
