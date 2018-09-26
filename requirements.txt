@@ -1,3 +1,4 @@
+pyz
 gunicorn==19.9.0
 cs50
 flask
