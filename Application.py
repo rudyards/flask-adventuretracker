@@ -14,7 +14,7 @@ from werkzeug.security      import check_password_hash, generate_password_hash
 from helper import falseHash, dehash
 
 
-app = Flask(__name__)
+app = Flask("tracker")
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 # Configure session to use filesystem (instead of signed cookies)
