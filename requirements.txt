@@ -1,4 +1,4 @@
-pyz
+pytz == 2013.7
 gunicorn==19.9.0
 cs50
 flask
