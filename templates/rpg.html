@@ -16,7 +16,7 @@
         <tr><td>Players:</td><td>
             {% if isGM == True %}  (Invite Link: <a href="/invite?code={{inviteHash}}">/invite?code={{inviteHash}}</a>) {% endif %}</td></tr>
         {% for player in playerlist %}
-            <tr><td>{% if gmName != player.get("username") %}{{player.get("username")}}{% endif %}</td><td>{% if isGM == True and gmName != player.get("username") %}<a href="/dropPlayer?rpgID={{rpgID}}&playerID={{player.get('id')}}">Drop Player</a>{% endif %}</td></tr>
+            <tr><td>{% if gmName != player[1] %}{{player[1]}}{% endif %}</td><td>{% if isGM == True and gmName != player[1] %}<a href="/dropPlayer?rpgID={{rpgID}}&playerID={{player[0]}}">Drop Player</a>{% endif %}</td></tr>
         {% endfor %}
         </table>
         <br>

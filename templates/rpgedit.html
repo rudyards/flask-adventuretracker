@@ -20,7 +20,7 @@
         <table align="center">
         {% for player in playerlist %}
             <!-- This should not be name, it should be ID, and the conditional should be around the row, not just the data -->
-            <tr><td>{% if gmName != player.get("username") %}{{player.get("username")}} {% endif %}</td></tr>
+            <tr><td>{% if gmName != player[1] %}{{player[1]}} {% endif %}</td></tr>
         {% endfor %}
         </table>
 
