@@ -1,8 +1,12 @@
+# $ export FLASK_APP=Application.py
+# $ python -m flask run
+
+
 import os
 import datetime
 import pytz
+import sqlite3 as lite
 
-from cs50                   import SQL
 from datetime               import datetime, tzinfo, timedelta
 from flask                  import Flask, flash, redirect, render_template, request, session
 from flask_session          import Session
@@ -14,6 +18,7 @@ from werkzeug.security      import check_password_hash, generate_password_hash
 from helper import falseHash, dehash
 
 
+
 app = Flask("tracker")
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
@@ -23,7 +28,11 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-db = SQL("sqlite:///finalproject.db")
+
+# Set up database connection
+con = None
+
+
 
 
 @app.route("/")
@@ -37,17 +46,35 @@ def main():
     if session.get("user_id") is None:
         return render_template("welcome.html")
     else:
-        gameIDs   = db.execute("SELECT rpgID FROM players WHERE usersID = :playerid", playerid = session["user_id"])
+        con = lite.connect("finalproject.db")
+        with con:
+            cur = con.cursor()
+            cur.execute("SELECT rpgID FROM players WHERE usersID = ?", [session["user_id"][0]])
+            gameIDs   = cur.fetchall()
         if gameIDs != []:
             ids = []
             for id in gameIDs:
-                ids.append(id.get("rpgID"))
-            gamesPlayingList = db.execute("SELECT * FROM rpgs WHERE id in (:idlist) AND NOT GMid = :userID", idlist = ids, userID = session["user_id"])
-            gamesGMing = db.execute("SELECT * FROM rpgs WHERE id in (:idlist) AND GMid = :userID", idlist = ids, userID = session["user_id"])
+                ids.append(id[0])
+            
+            with con:
+                cur = con.cursor()
+                print(str(ids))
+                idlist = str(ids)[1:-1]
+                
+                print(idlist)
+                print(session["user_id"][0])
+                # cur.execute("SELECT * FROM rpgs WHERE id in (?) AND NOT GMid = ?", [idlist, session["user_id"][0]])
+                cur.execute("SELECT * FROM rpgs WHERE id in (8, 9, 10, 11, 13) AND NOT GMid = 5")
+                gamesPlayingList = cur.fetchall()
+                print(gamesPlayingList)
+                cur.execute("SELECT * FROM rpgs WHERE id in (?) AND GMid = ?", [idlist, session["user_id"][0]])
+                gamesGMing = cur.fetchall()
+                print(gamesGMing)
         else:
             gamesPlayingList = []
             gamesGMing = []
 
+        con.close()
         return render_template("main.html", gamesPlayingList = gamesPlayingList, gamesGMing = gamesGMing)
 
 
@@ -67,23 +94,37 @@ def login():
            return render_template("login.html")
 
         # Query database for username
-        rows = db.execute("SELECT * FROM users WHERE username = :username",
-                           username=request.form.get("username"))
+        con = lite.connect("finalproject.db")
+        with con:
+            cur = con.cursor()
+            cur.execute("SELECT passwordhash FROM users WHERE username = ?",
+                               [request.form.get("username")])
+            rows = cur.fetchone()
 
         # Ensure username exists and password is correct
-        if len(rows) != 1 or not check_password_hash(rows[0]["passwordhash"], request.form.get("password")):
+
+        if rows == None or (check_password_hash(rows[0], request.form.get("password")) == False):
             flash('Invalid username or password')
+            print("\n"+str(rows != None)+"\n")
+            print("\n"+str(check_password_hash(rows[0], request.form.get("password")))+"\n")
             return render_template("login.html")
 
         # Remember which user has logged in
-        session["user_id"] = rows[0]["id"]
+        with con:
+            cur = con.cursor()
+            cur.execute("SELECT id FROM users WHERE username = ?",
+                               [request.form.get("username")])
+            rows = cur.fetchone()
+        session["user_id"] = rows
 
         # Redirect user to home page
         if (session.get("followUp") is None):
+            con.close()
             return redirect("/")
         else:
             destination = session.get("followUp")
             session["followUp"] = None
+            con.close()
             return redirect(destination)
 
     else:
@@ -92,11 +133,11 @@ def login():
 @app.route("/register", methods = ["POST", "GET"])
 def register():
     if request.method == "POST":
+
         # Ensure username was submitted
         if not request.form.get("username"):
             flash("Please provide a username")
             return render_template("register.html")
-
         # Ensure password was submitted
         elif not request.form.get("password"):
             flash("Please provide a password")
@@ -106,25 +147,42 @@ def register():
             flash("Those passwords don't match")
             return render_template("register.html")
 
+
+        username = request.form.get("username")
+        password = request.form.get("password")
         # Query database for username to make sure that user doesn't already exist
-        rows = db.execute("SELECT * FROM users WHERE username = :username",
-                          username=request.form.get("username"))
-        if len(rows) == 1:
+        con = lite.connect("finalproject.db")
+        with con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM users WHERE username = ?", [username])
+            thisrows = cur.fetchone()
+        if thisrows != None:
             flash("Someone with that username already exists. Did you forget your password?")
             return render_template("register.html")
         else:
         #If all that's good to go, create the user, then redirect
             userspassword = generate_password_hash(request.form.get("password"))
-            db.execute("INSERT INTO users (username, passwordhash, email) VALUES (:username, :password, :email)", username = request.form.get("username"),
-                    password = userspassword, email = request.form.get("email"))
-            rows = db.execute("SELECT * FROM users WHERE username =:username", username = request.form.get("username"))
-            session["user_id"] = rows[0]["id"]
+            with con:
+                cur = con.cursor()
+                cur.execute("INSERT INTO users (username, passwordhash, email) VALUES (?, ?, ?)", 
+                    [request.form.get("username"), userspassword, request.form.get("email")])
+                cur.execute("SELECT * FROM users WHERE username = ?", [request.form.get("username")])
+                thisrows = cur.fetchone()
+                print(thisrows[0])
+                session["user_id"] = thisrows[0]
+
+        #redirect user to the proper next page and close the connection
         if (session.get("followUp") is None):
+            if con:
+                con.close()
             return redirect("/")
         else:
+            if con:
+                con.close()
             destination = session.get["followUp"]
             session["followUp"] = None
             return redirect(destination)
+
     else:
         return render_template("register.html")
 

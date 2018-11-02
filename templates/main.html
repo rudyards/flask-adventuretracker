@@ -10,8 +10,8 @@
         <table>
         {% for game in gamesGMing %}
             <tr>
-                <td><b><a href="/rpg?rpgID={{game.get("id")}}"><u>{{game.get("Name")}}</u></a></b></td>
-                <td>:{{game.get("Description")}}</td>
+                <td><b><a href="/rpg?rpgID={{game[0]}}"><u>{{game[2]}}</u></a></b></td>
+                <td>:{{game[3]}}</td>
                 </tr>
         {% endfor %}
         </table>
@@ -24,8 +24,8 @@
         <table>
         {% for game in gamesPlayingList %}
             <tr>
-                <td><b><a href="/rpg?rpgID={{game.get("id")}}"><u>{{game.get("Name")}}</u></a></b>:</td>
-                <td>{{game.get("Description")}}</td>
+                <td><b><a href="/rpg?rpgID={{game[0]}}"><u>{{game[2]}}</u></a></b>:</td>
+                <td>{{game[3]}}</td>
                 </tr>
         {% endfor %}
         </table>
