@@ -37,12 +37,9 @@ con = None
 
 @app.route("/")
 def main():
-    # TODO: make it so that if you aren't logged in, you're automatically brought to login page?
-
     # You are currently in the following games:
     # Table of games
     # Button on the far right of the table that says 'Manage'. Clicking it takes you to that game's page
-    # Button at the bottom that says 'Create a new game' that takes you to the create game page, the same way that clicking on the header does.
     if session.get("user_id") is None:
         return render_template("welcome.html")
     else:
@@ -52,33 +49,27 @@ def main():
             cur.execute("SELECT rpgID FROM players WHERE usersID = ?", [session["user_id"][0]])
             gameIDs   = cur.fetchall()
         if gameIDs != []:
+            #iterate through all the games that the user is a player/GM in
             ids = []
             for id in gameIDs:
                 ids.append(id[0])
             
             with con:
                 cur = con.cursor()
-                print(str(ids))
                 idlist = str(ids)[1:-1]
                 
-                print(idlist)
-                print(session["user_id"][0])
-                # cur.execute("SELECT * FROM rpgs WHERE id in (?) AND NOT GMid = ?", [idlist, session["user_id"][0]])
-                cur.execute("SELECT * FROM rpgs WHERE id in (8, 9, 10, 11, 13) AND NOT GMid = 5")
+                #fetch all the games that user is a player in, and save that to one variable. 
+                cur.execute("SELECT * FROM rpgs WHERE id in ({0}) AND NOT GMid = {1}".format(idlist, session["user_id"][0]))
                 gamesPlayingList = cur.fetchall()
-                print(gamesPlayingList)
-                cur.execute("SELECT * FROM rpgs WHERE id in (?) AND GMid = ?", [idlist, session["user_id"][0]])
+                #fetch all the games where the user is a GM, save that to another variable.
+                cur.execute("SELECT * FROM rpgs WHERE id in ({0}) AND GMid = {1}".format(idlist, session["user_id"][0]))
                 gamesGMing = cur.fetchall()
-                print(gamesGMing)
         else:
             gamesPlayingList = []
             gamesGMing = []
 
         con.close()
         return render_template("main.html", gamesPlayingList = gamesPlayingList, gamesGMing = gamesGMing)
-
-
-
 
 @app.route("/login", methods = ["POST", "GET"])
 def login():
@@ -207,18 +198,28 @@ def create():
             return render_template("create.html")
 
         thisrpgName = request.form.get("RPGName")
-        rows = db.execute("SELECT * FROM rpgs WHERE name = :RPGName", RPGName = thisrpgName)
-        if len(rows) == 1:
+        con = lite.connect("finalproject.db")
+        cur = con.cursor()
+
+        cur.execute("SELECT * FROM rpgs WHERE name = ?", [thisrpgName])
+        rows = cur.fetchone()
+        #We first check to see if there is already an RPG with that name, if so the user must choose a new RPG name
+        if rows != None:
             flash("An RPG with that name already exists. Please input a different name.")
+            con.close()
             return render_template("create.html")
         else:
-            db.execute("INSERT INTO rpgs (GMid, name, description) VALUES (:GMid, :name, :description)",
-                GMid = session.get("user_id"), name = thisrpgName, description = request.form.get("Description"))
+            #Then, we create the RPG and add the user to it as the first "player" (even though they're a GM)
+            cur.execute("INSERT INTO rpgs (GMid, name, description) VALUES (?, ?, ?)",
+                [session.get("user_id"), thisrpgName, request.form.get("Description")])
 
-            rows2 = db.execute("SELECT id FROM rpgs WHERE name = :newRPGNAME", newRPGNAME = thisrpgName)
-            thisRPGid = rows2[0]["id"]
-            db.execute("INSERT INTO players (rpgID, usersID) VALUES (:rpgID, :userID)",
-                rpgID = thisRPGid, userID = session.get("user_id"))
+            cur.execute("SELECT id FROM rpgs WHERE name = ?", thisrpgName)
+            rows2 = cur.fetchone()
+            thisRPGid = rows2[0]
+            cur.execute("INSERT INTO players (rpgID, usersID) VALUES (?, ?)",
+                [thisRPGid, session.get("user_id")])
+            
+            con.close()
             return redirect("/")
     else:
         return render_template("create.html")
@@ -226,49 +227,74 @@ def create():
 
 @app.route("/settings", methods = ["POST", "GET"])
 def settings():
+    con = lite.connect("finalproject.db")
+    cur = con.cursor()
     if request.method == "POST":
         if request.form.get("username"):
+            #usernames are unique, so we need to make sure no one else in the database has that username. 
+            #If someone does, we flash an alert.
             newUsername = request.form.get("username")
-            db.execute("UPDATE users SET username = :newusername WHERE id = :user", newusername = newUsername, user = session.get("user_id"))
-            session.get("user_id") == newUsername
+            cur.execute("SELECT id FROM users WHERE username = ?", [newUsername])
+            rows = cur.fetchone
+            if rows != None:
+                cur.execute("UPDATE users SET username = ? WHERE id = ?", [newUsername, session.get("user_id")])
+            else:
+                flash("Someone already has that username! Please try again.")
         if request.form.get("timezone"):
+            #Now we're gonna set a new timezone. Throughout this process, if the input isn't valid, then they are returned
+            #the same template, automatically filled in with their default settings
+            #Try//except block is a good way of catching problematic inputs.
             try:
                 newTimezone = int(request.form.get("timezone"))
             except:
                 flash("You have input something that is not a number. Please try again.")
-                rows = db.execute("SELECT * FROM users WHERE id = :user", user = session.get("user_id"))
-                return render_template("settings.html", username = rows[0]["username"], timezone = rows[0]["timezone"])
+                cur.execute("SELECT * FROM users WHERE id = ?", [session.get("user_id")])
+                rows = cur.fetchone()
+                return render_template("settings.html", username = rows["username"], timezone = rows["timezone"])
             if newTimezone > 13 or newTimezone < -11:
                 flash("You have input an invalid timezone. Please try again.")
-                rows = db.execute("SELECT * FROM users WHERE id = :user", user = session.get("user_id"))
-                return render_template("settings.html", username = rows[0]["username"], timezone = rows[0]["timezone"])
+                cur.execute("SELECT * FROM users WHERE id = ?", [session.get("user_id")])
+                rows = cur.fetchone()
+                return render_template("settings.html", username = rows["username"], timezone = rows["timezone"])
             else:
-                rows = db.execute("UPDATE users SET timezone = :newTimeZone WHERE id = :user", newTimeZone = newTimezone, user = session.get("user_id"))
-        rows = db.execute("SELECT * FROM users WHERE id = :user", user = session.get("user_id"))
-        return render_template("settings.html", username = rows[0]["username"], timezone = rows[0]["timezone"] )
+                cur.execute("UPDATE users SET timezone = ? WHERE id = ?", [newTimezone, session.get("user_id")])
+        #now rerender the template with their default settings (potentially now changed)
+        rows = db.execute("SELECT * FROM users WHERE id = ?", [session.get("user_id")])
+        con.close()
+        return render_template("settings.html", username = rows["username"], timezone = rows["timezone"] )
     else:
-        rows = db.execute("SELECT * FROM users WHERE id = :user", user = session.get("user_id"))
-        return render_template("settings.html", username = rows[0]["username"], timezone = rows[0]["timezone"])
+        cur.execute("SELECT * FROM users WHERE id = ?", [session.get("user_id")])
+        rows = cur.fetchone()
+        con.close()
+        return render_template("settings.html", username = rows["username"], timezone = rows["timezone"])
 
 @app.route("/rpg")
 def rpg():
+    con = lite.connect("finalproject.db")
+    cur = con.cursor()
+
     thisID = request.args.get('rpgID')
-    rows = db.execute("SELECT * FROM rpgs WHERE id = :rpgID", rpgID = thisID)
+    cur.execute("SELECT * FROM rpgs WHERE id = ?", [thisID])
+    rows = cur.fetchone()
 
-    gameName = rows[0]["Name"]
-    gameDescription = rows[0]["Description"]
-    gameID = rows[0]["id"]
+    gameName = rows["Name"]
+    gameDescription = rows["Description"]
+    gameID = rows["id"]
 
-    gameGMID = rows[0]["GMid"]
-    gmrows = db.execute("SELECT * FROM users WHERE id = :gmID", gmID = gameGMID)
-    thisGMName = gmrows[0]["username"]
+    gameGMID = rows["GMid"]
+    cur.execute("SELECT * FROM users WHERE id = ?", [gameGMID])
+    gmrows = cur.fetchone()
+    thisGMName = gmrows["username"]
 
-    playerIDs = db.execute("SELECT * FROM players WHERE rpgID = :thisID", thisID = gameID)
+    playerIDs = db.execute("SELECT * FROM players WHERE rpgID = ?", [gameID])
     if playerIDs != []:
         ids = []
         for id in playerIDs:
-            ids.append(id.get("usersID"))
-        thisplayerlist = db.execute("SELECT * FROM users WHERE id in (:idlist)", idlist = ids)
+            ids.append(id[0])
+
+        idlists = str(ids)[1:-1]
+        cur.execute("SELECT * FROM users WHERE id in ({0})".format(idlists))
+        thisplayerlist = cur.fetchall()
     else:
         thisplayerlist = []
 
@@ -278,24 +304,27 @@ def rpg():
         thisisPlayer = False
     else:
         thisisGM = False
-        rows2 = db.execute("SELECT * FROM players WHERE rpgID = :thisID AND usersID = :thisUser" , thisID = gameID, thisUser = session.get("user_id"))
-        if len(rows2) == 1:
+        cur.execute("SELECT * FROM players WHERE rpgID = ? AND usersID = ?" , [gameID, session.get("user_id")])
+        rows = cur.fetchone()
+        if rows != None:
             thisisPlayer = True
         else:
             thisisPlayer = False
     currentTime = datetime.now()
     print(currentTime)
     try:
-        rows3 = db.execute("SELECT * FROM users WHERE id = :thisUser", thisUser = session.get("user_id"))
+        cur.execute("SELECT * FROM users WHERE id = ?", [session.get("user_id")])
+        rows3 = cur.selectone()
     except:
         flash("Please log in")
         return redirect("/")
-    thisTimeZone = rows3[0]["timezone"]
+    thisTimeZone = rows3["timezone"]
     currentTime = currentTime + timedelta(hours=int(thisTimeZone))
     print(currentTime)
     try:
-        scheduleRows = db.execute("SELECT * FROM rpgmeetings WHERE rpgID = :thisID AND MeetingTime > :currentTime ORDER BY MeetingTime ASC",
-            thisID = gameID, currentTime = str(currentTime))
+        cur.execute("SELECT * FROM rpgmeetings WHERE rpgID = ? AND MeetingTime > ? ORDER BY MeetingTime ASC",
+            [gameID, str(currentTime)])
+        scheduleRows = cur.fetchall()
         print(scheduleRows)
         i = 0
         meetingsList = []
