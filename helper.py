@@ -15,4 +15,3 @@ def dehash(hash):
     reverseHash = hash[2:hashLen - 6] + hash[hashLen - 5]
     trueHash = int(reverseHash) / 11
     return trueHash
-

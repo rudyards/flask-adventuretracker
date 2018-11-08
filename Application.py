@@ -241,7 +241,7 @@ def settings():
             #If someone does, we flash an alert.
             newUsername = request.form.get("username")
             cur.execute("SELECT id FROM users WHERE username = ?", [newUsername])
-            rows = cur.fetchone
+            rows = cur.fetchone()
             if rows == None:
                 cur.execute("UPDATE users SET username = ? WHERE id = ?", [newUsername, thisuser])
             else:
@@ -309,13 +309,13 @@ def rpg():
         thisplayerlist = []
 
     thisHash = falseHash(gameID)
-    if gameGMID == session.get("user_id"):
+    thisUser = session.get("user_id")
+    thisUser = str(thisUser)[1:-2]
+    if str(gameGMID) == str(thisUser):
         thisisGM = True
         thisisPlayer = False
     else:
         thisisGM = False
-        thisUser = session.get("user_id")
-        thisUser = str(thisUser)[1:-2]
         cur.execute("SELECT * FROM players WHERE rpgID = ? AND usersID = ?" , [gameID, thisUser])
         rows = cur.fetchone()
         if rows != None:
@@ -355,7 +355,7 @@ def rpg():
         thisTimezone = ""
 
     con.close()
-    print([gameName, gameDescription, thisGMName, gameID, thisplayerlist, thisHash, thisisGM, thisisPlayer, nextMeeting, meetingsList, thisTimezone])
+    #print([gameName, gameDescription, thisGMName, gameID, thisplayerlist, thisHash, thisisGM, thisisPlayer, nextMeeting, meetingsList, thisTimezone])
     return render_template("rpg.html", rpgname = gameName, rpgDescription = gameDescription, gmName = thisGMName,
         rpgID = gameID, playerlist = thisplayerlist, inviteHash = thisHash, isGM = thisisGM, isPlayer = thisisPlayer,
         nextMeeting = nextMeeting, meetingsList = meetingsList, timezone = thisTimezone)
@@ -375,11 +375,17 @@ def dropPlayer():
         cur.execute("SELECT * FROM rpgs WHERE id = ?", [thisgameID])
         rows = cur.fetchone()
         #If the GM of the RPG accessed isn't the same as the currently logged in user, attempts to drop users will fail
-        if (rows["GMid"] != session.get("user_id")):
+        thisUser = session.get("user_id")
+        thisUser = str(thisUser)[1:-2]
+        if (str(rows[1]) != thisUser):
             flash("You cannot remove players from games that you aren't GMing")
             con.close()
             return redirect("/")
         else:
+            print("GameID:")
+            print(thisgameID)
+            print("PlayerID:")
+            print(thisplayerID)
             cur.execute("DELETE FROM players WHERE rpgID = ? AND usersID = ?", [thisgameID, thisplayerID])
             con.close()
             return redirect("rpg?rpgID="+thisgameID)
@@ -388,28 +394,33 @@ def dropPlayer():
         thisPlayer = request.args.get('playerID')
         
         cur.execute("SELECT * FROM users WHERE id = ?", [thisPlayer])
-        rows = fetchone()
-        thisplayerName = rows["username"]
+        rows = cur.fetchone()
+        thisplayerName = rows[1]
 
 
         cur.execute("SELECT * FROM rpgs WHERE id = ?", [thisID])
         rows = cur.fetchone()
-        thisRPGName = rows["Name"]
+        thisRPGName = rows[2]
         
         con.close()
         return render_template("dropPlayer.html", rpgID = thisID, playerID = thisPlayer, playerName = thisplayerName, RPGName = thisRPGName)
 
 @app.route("/rpgedit", methods = ["POST", "GET"])
 def rpgedit():
+    con = lite.connect("finalproject.db")
+    cur = con.cursor()
     if request.method == "POST":
         if not request.form.get("rpgID"):
             flash("You shouldn't be here")
+            con.close()
             return redirect("/")
         if not request.form.get("gameName"):
             flash("Please provide a name for your RPG")
+            con.close()
             return redirect("/")
         if not request.form.get("gameDescription"):
             flash("Please provide a description for your RPG")
+            con.close()
             return redirect("/")
 
         rpgID = request.form.get("rpgID")
@@ -417,51 +428,72 @@ def rpgedit():
         newgameName = request.form.get("gameName")
 
 
+        cur.execute("UPDATE rpgs SET name = ?, description = ? WHERE id = ?",
+            [request.form.get("gameName"), request.form.get("gameDescription"), request.form.get("rpgID")])
 
-
-        db.execute("UPDATE rpgs SET name = :gameName, description = :gameDescription WHERE id = :rpgID",
-            gameName = request.form.get("gameName"), gameDescription = request.form.get("gameDescription"), rpgID = request.form.get("rpgID"))
-
+        con.close()
         return redirect("/")
     else:
         thisID = request.args.get('rpgID')
-        rows = db.execute("SELECT * FROM rpgs WHERE id = :rpgID", rpgID = thisID)
-        if (rows[0]["GMid"] != session.get("user_id")):
+        cur.execute("SELECT * FROM rpgs WHERE id = ?", [thisID])
+        rows = cur.fetchone()
+
+        thisUser = session.get("user_id")
+        thisUser = str(thisUser)[1:-2]
+        gameGMID = rows[1]
+
+        if (str(gameGMID) != thisUser):
             flash("You cannot edit RPGs that you are not the GM for")
+            con.close()
             return redirect("/")
 
-        gameName = rows[0]["Name"]
-        gameDescription = rows[0]["Description"]
-        gameID = rows[0]["id"]
+        gameName = rows[2]
+        gameDescription = rows[3]
+        gameID = rows[0]
 
-        gameGMID = rows[0]["GMid"]
-        gmrows = db.execute("SELECT * FROM users WHERE id = :gmID", gmID = gameGMID)
-        thisGMName = gmrows[0]["username"]
 
-        playerIDs = db.execute("SELECT * FROM players WHERE rpgID = :thisID", thisID = gameID)
+        cur.execute("SELECT * FROM users WHERE id = ?", [gameGMID])
+        gmrows = cur.fetchone()
+        thisGMName = gmrows[1]
+
+        cur.execute("SELECT * FROM players WHERE rpgID = ?", [gameID])
+        playerIDs = cur.fetchall()
         if playerIDs != []:
             ids = []
             for id in playerIDs:
-                ids.append(id.get("usersID"))
-            thisplayerlist = db.execute("SELECT * FROM users WHERE id in (:idlist)", idlist = ids)
+                ids.append(id[0])
+            cur.execute("SELECT * FROM users WHERE id in ({0})".format(ids))
+            thisplayerlist = cur.fetchall()
         else:
             thisplayerlist = []
+        con.close()
         return render_template("rpgedit.html", rpgname = gameName, rpgDescription = gameDescription, gmName = thisGMName, playerlist = thisplayerlist, rpgID = gameID)
 
 @app.route("/deleterpg", methods = ["GET", "POST"])
 def deleterpg():
+    con = lite.connect("finalproject.db")
+    cur = con.cursor()    
     if request.method == "POST":
         gameID = request.form.get("rpgID")
-        db.execute("DELETE FROM rpgs WHERE id = :rpgID", rpgID = gameID)
-        db.execute("DELETE FROM players WHERE rpgID = :rpgID", rpgID = gameID)
+        cur.execute("DELETE FROM rpgs WHERE id = ?", [gameID])
+        cur.execute("DELETE FROM players WHERE rpgID = ?", [gameID])
+        con.close()
         return redirect("/")
     else:
         gameID = request.args.get('rpgID')
-        rows = db.execute("SELECT * FROM rpgs WHERE id = :rpgID", rpgID = gameID)
-        if (rows[0]["GMid"] != session.get("user_id")):
+        cur.execute("SELECT * FROM rpgs WHERE id = ?", [gameID])
+        rows = cur.fetchone()
+
+        thisUser = session.get("user_id")
+        thisUser = str(thisUser)[1:-2]
+        gameGMID = rows[1]
+
+        if (str(gameGMID) != thisUser):
             flash("You cannot delete RPGs that you are not the GM for")
+            con.close()
             return redirect("/")
-        return render_template("deleterpg.html", RPGName = rows[0]["Name"], rpgID = rows[0]["id"])
+        con.close()
+        return render_template("deleterpg.html", RPGName = rows[2], rpgID = rows[0])
 
 @app.route("/invite", methods = ["GET", "POST"])
 def invite():
@@ -471,22 +503,39 @@ def invite():
             session["followUp"] = "/invite?code="+str(request.form.get("gameHash"))
             return redirect("/login")
         else:
+            con = lite.connect("finalproject.db")
+            cur = con.cursor()
+
+
             gameID = int(dehash(request.form.get("gameHash")))
-            rows = db.execute("SELECT * FROM players WHERE rpgID = :thisGame AND usersID = :thisUser", thisGame = gameID, thisUser = session.get("user_id"))
-            if len(rows) == 0:
-                db.execute("INSERT INTO players (rpgID, usersID) VALUES (:thisGame, :thisUser)", thisGame = gameID, thisUser = session.get("user_id"))
+            thisUser = session.get("user_id")
+            thisUser = str(thisUser)[1:-2]
+
+            rows = cur.execute("SELECT * FROM players WHERE rpgID = ? AND usersID = ?", [gameID, thisUser])
+            rows = cur.fetchone()
+            if rows == None:
+                cur.execute("INSERT INTO players (rpgID, usersID) VALUES (?, ?)", [gameID, thisUser])
                 destination = "/rpg?rpgID="+str(gameID)
                 flash("You've joined this RPG!")
+                con.close()
                 return redirect(destination)
             else:
                 destination = "/rpg?rpgID="+str(gameID)
                 flash("You cannot join this RPG because you are already in this RPG")
+                con.close()
                 return redirect(destination)
     else:
         thisgameHash = request.args.get('code')
         gameID = int(dehash(thisgameHash))
-        rows = db.execute("SELECT * FROM rpgs WHERE id = :rpgID", rpgID = gameID)
-        return render_template("invite.html", RPGName = rows[0]["Name"], Description = rows[0]["Description"], gameHash = thisgameHash)
+
+        con = lite.connect("finalproject.db")
+        cur = con.cursor()
+
+        cur.execute("SELECT * FROM rpgs WHERE id = ?", [gameID])
+        rows = cur.fetchone()
+
+        con.close()
+        return render_template("invite.html", RPGName = rows[2], Description = rows[3], gameHash = thisgameHash)
 
 @app.route("/schedule", methods = ["POST", "GET"])
 def schedule():
@@ -518,9 +567,12 @@ def schedule():
                 return render_template("schedule.html", gameID = thisID,
                     dateAttempt = dateAttempt, timeAttempt = timeAttempt, locationAttempt = locationAttempt)
 
-            db.execute("INSERT INTO rpgMeetings (Location, MeetingTime, rpgID, timezone) VALUES (:thisLocation, :thisTime, :thisRPG, :thisTimezone)",
-                thisLocation = locationAttempt, thisTime = str(meetingDateTime), thisRPG = thisID, thisTimezone = request.form.get("timezone"))
+            con = lite.connect("finalproject.db")
+            cur = con.cursor()
+            cur.execute("INSERT INTO rpgMeetings (Location, MeetingTime, rpgID, timezone) VALUES (?, ?, ?, ?)",
+                [locationAttempt, str(meetingDateTime), thisID, request.form.get("timezone")])
             flash("Meeting added")
+            con.close()
             return redirect("rpg?rpgID="+thisID)
         elif request.form['action'] == 'Check':
             thisID = request.form.get("gameID")
@@ -542,23 +594,32 @@ def schedule():
             date = str(request.form.get("date"))
             time = str(request.form.get("time"))
             combined = date + " " + time
-            GMTime = db.execute("SELECT * FROM users WHERE id = :userID", userID = session["user_id"])
+
+            con = lite.connect("finalproject.db")
+            cur = con.cursor()
+            thisUser = session.get("user_id")
+            thisUser = str(thisUser)[1:-2]
+
+            db.execute("SELECT * FROM users WHERE id = ?", [thisUser])
+            GMTime = cur.fetchone()
             try:
                 meetingDateTime = datetime.strptime(combined, '%m/%d/%Y %H:%M') - timedelta(hours=int(GMTime[0]["timezone"]))
             except:
                 flash("You didn't give date or time in a valid format. Please try again.")
+                con.close()
                 return render_template("schedule.html", gameID = thisID,
                     dateAttempt = dateAttempt, timeAttempt = timeAttempt, locationAttempt = locationAttempt)
 
             print(str(meetingDateTime))
-            rows = db.execute("SELECT usersID FROM players WHERE rpgID = :gameID", gameID = thisID)
+            cur.execute("SELECT usersID FROM players WHERE rpgID = ?", [thisID])
+            rows = fetchall()
             ids = []
             if rows != []:
                 for id in rows:
-                    if id.get("usersID") != session["user_id"]:
-                        ids.append(id.get("usersID"))
-            rows2 = db.execute("SELECT * FROM users WHERE id in (:idlist)", idlist = ids)
-            # print(rows2)
+                    if str(id[0]) != thisUser:
+                        ids.append(id[0])
+            cur.execute("SELECT * FROM users WHERE id in ({0})".format(ids))
+            rows2 = cur.fetchall()
             playerTimes = []
             for user in rows2:
                 thisPlayerTime = meetingDateTime + timedelta(hours=int(user.get("timezone")))
@@ -572,12 +633,20 @@ def schedule():
         if thisID is None:
             flash("Invalid ID")
             return redirect("/")
-        rows = db.execute("SELECT * FROM rpgs WHERE id = :rpgID", rpgID = thisID)
-        if (rows[0]["GMid"] != session.get("user_id")):
+
+        con = lite.connect("finalproject.db")
+        cur = con.cursor()
+        cur.execute("SELECT * FROM rpgs WHERE id = ?", [thisID])
+        rows = cur.fetchone()
+        thisUser = session.get("user_id")
+        thisUser = str(thisUser)[1:-2]
+
+        if (str(rows[1]) != thisUser):
             flash("You cannot edit RPGs that you are not the GM for")
             return redirect("/")
-        rows = db.execute("SELECT * FROM users WHERE id = :userID", userID = session.get("user_id"))
-        return render_template("schedule.html", gameID = thisID, timezone = rows[0]["timezone"])
+        cur.execute("SELECT * FROM users WHERE id = ?", [thisUser])
+        rows = cur.fetchone()
+        return render_template("schedule.html", gameID = thisID, timezone = rows[5])
 
 @app.route("/leaveRPG", methods = ["POST", "GET"])
 def leaveRPG():
@@ -586,11 +655,20 @@ def leaveRPG():
         if thisID is None:
             flash("Invalid ID")
             return redirect("/")
-        rows = db.execute("SELECT * FROM players WHERE id = :rpgID AND usersID = :thisUser", rpgID = thisID, thisUser = session.get("user_id"))
-        if len(rows) != 1:
+
+        con = lite.connect("finalproject.db")
+        cur = con.cursor()    
+        thisUser = session.get("user_id")
+        thisUser = str(thisUser)[1:-2]
+
+
+        cur.execute("SELECT * FROM players WHERE id = ? AND usersID = ?", [thisID, thisUser])
+        rows = cur.fetchone()
+        if rows == None:
             flash("You are not in this RPG")
         else:
-            db.execute("DELETE FROM players WHERE id = :rpgID AND usersID = :thisUser", rpgID = thisID, thisUser = session.get("user_id"))
+            cur.execute("DELETE FROM players WHERE id = ? AND usersID = ?", [thisID, thisUser])
+        con.close()
         return redirect("/")
     else:
         thisID = request.args.get('rpgID')
