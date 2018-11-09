@@ -86,6 +86,7 @@ def login():
 
         # Query database for username
         con = lite.connect("finalproject.db")
+
         with con:
             cur = con.cursor()
             cur.execute("SELECT passwordhash FROM users WHERE username = ?",
@@ -96,8 +97,6 @@ def login():
 
         if rows == None or (check_password_hash(rows[0], request.form.get("password")) == False):
             flash('Invalid username or password')
-            print("\n"+str(rows != None)+"\n")
-            print("\n"+str(check_password_hash(rows[0], request.form.get("password")))+"\n")
             return render_template("login.html")
 
         # Remember which user has logged in
@@ -300,11 +299,13 @@ def rpg():
     if playerIDs != []:
         ids = []
         for id in playerIDs:
-            ids.append(id[0])
+            ids.append(id[1])
 
         idlists = str(ids)[1:-1]
+
         cur.execute("SELECT * FROM users WHERE id in ({0})".format(idlists))
         thisplayerlist = cur.fetchall()
+        print(thisplayerlist)
     else:
         thisplayerlist = []
 
@@ -323,7 +324,6 @@ def rpg():
         else:
             thisisPlayer = False
     currentTime = datetime.now()
-    print(currentTime)
     try:
         thisUser = session.get("user_id")
         thisUser = str(thisUser)[1:-2]
@@ -335,12 +335,10 @@ def rpg():
         return redirect("/")
     thisTimeZone = rows3[5]
     currentTime = currentTime + timedelta(hours=int(thisTimeZone))
-    print(currentTime)
     try:
         cur.execute("SELECT * FROM rpgmeetings WHERE rpgID = ? AND MeetingTime > ? ORDER BY MeetingTime ASC",
             [gameID, str(currentTime)])
         scheduleRows = cur.fetchall()
-        print(scheduleRows)
         i = 0
         meetingsList = []
         while i < len(scheduleRows):
@@ -626,6 +624,7 @@ def schedule():
                 thisPlayerTime = thisPlayerTime.strftime("%I:%M%p %A, %b %d, %Y")
                 playerTimes.append(user.get("username")+": " + str(thisPlayerTime))
 
+            con.close()
             return render_template("schedule.html", gameID = thisID,
                     dateAttempt = dateAttempt, timeAttempt = timeAttempt, locationAttempt = locationAttempt, playerTimes = playerTimes)
     else:
@@ -643,9 +642,11 @@ def schedule():
 
         if (str(rows[1]) != thisUser):
             flash("You cannot edit RPGs that you are not the GM for")
+            con.close()
             return redirect("/")
         cur.execute("SELECT * FROM users WHERE id = ?", [thisUser])
         rows = cur.fetchone()
+        con.close()
         return render_template("schedule.html", gameID = thisID, timezone = rows[5])
 
 @app.route("/leaveRPG", methods = ["POST", "GET"])
